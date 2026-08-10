@@ -5,7 +5,12 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx watch src/server.ts",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "build": "npx tsc",
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +19,8 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^1.0.0-rc.4",
     "express": "^5.2.1",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
