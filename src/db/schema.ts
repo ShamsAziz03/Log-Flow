@@ -6,7 +6,6 @@ import {
   index,
   uuid,
   pgEnum,
-  unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
@@ -37,10 +36,12 @@ export const logs = pgTable(
       .$type<Record<string, string | number | boolean>>(),
   },
   (table) => [
-    unique().on(table.timestamp, table.id),
     index("idx_logs_time_id").on(table.timestamp.desc(), table.id.desc()),
     index("idx_logs_service_level").on(table.service, table.level),
-    index("idx_logs_attributes").using("gin", table.attributes),
+    index("idx_logs_attributes").using(
+      "gin",
+      sql`${table.attributes} jsonb_path_ops`,
+    ),
   ],
 );
 

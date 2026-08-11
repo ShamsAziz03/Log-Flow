@@ -10,10 +10,9 @@ CREATE TABLE "logs" (
   "service" text NOT NULL,
   "level" "log_level" DEFAULT 'info' NOT NULL,
   "message" text NOT NULL,
-  "attributes" jsonb DEFAULT '{}'::jsonb NOT NULL,
-   CONSTRAINT "logs_timestamp_id_unique" UNIQUE ("timestamp", "id")
+  "attributes" jsonb DEFAULT '{}'::jsonb NOT NULL
 ) PARTITION BY RANGE ("timestamp");
 
 CREATE INDEX idx_logs_time_id ON logs (timestamp DESC, id DESC);
 CREATE INDEX idx_logs_service_level ON logs (service, level);
-CREATE INDEX idx_logs_attributes ON logs USING GIN (attributes);  
+CREATE INDEX idx_logs_attributes ON logs USING GIN (attributes jsonb_path_ops);
