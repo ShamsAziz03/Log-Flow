@@ -3,8 +3,8 @@ import { appState } from "../states.js";
 
 export function getHealth(req: Request, res: Response) {
   if (appState.dbReady) {
-    res.status(200).json({ status: "ok" });
+    res.status(200).json({ status: "Server ready" });
   } else {
-    res.status(503).json({ status: "not ready" });
+    res.status(503).json({ status: "Server not ready, try again" });
   }
 }
