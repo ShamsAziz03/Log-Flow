@@ -54,7 +54,7 @@ function errorHandler(
     });
   }
 
-  res.status(500).json({
+  return res.status(500).json({
     error: err.message,
   });
 }
@@ -63,7 +63,7 @@ app.use(healthRouter);
 app.use(logsRouter);
 
 app.use((req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     error: "Route not found",
   });
 });
