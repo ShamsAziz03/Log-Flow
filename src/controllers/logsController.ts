@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import { BadRequestError } from "../errors/badRequest.js";
 import { isValidLogEntry } from "../services/ingestionLogs.js";
 import { db } from "../db/index.js";
+import { sql } from "drizzle-orm";
+import { logs } from "../db/schema.js";
+import { uuidv7 } from "uuidv7";
 
 type AcceptedLogEntry = {
   timestamp: string;
@@ -15,7 +18,14 @@ type RejectedLogEntry = {
   reason: string;
 };
 
-export function insertLogs(req: Request, res: Response) {
+function toSqlArray(values: any[]) {
+  return sql`ARRAY[${sql.join(
+    values.map((v) => sql`${v}`),
+    sql`, `,
+  )}]`;
+}
+
+export async function insertLogs(req: Request, res: Response) {
   const logs = req.body.logs;
   const rejectedLogs: RejectedLogEntry[] = [];
   const acceptedLogs: AcceptedLogEntry[] = [];
@@ -45,6 +55,26 @@ export function insertLogs(req: Request, res: Response) {
   }
 
   //add accepted logs to database
+  const ids = acceptedLogs.map(() => uuidv7());
+  await db.execute(sql`
+  INSERT INTO logs (
+    id,
+    timestamp,
+    level,
+    service,
+    message,
+    attributes
+  )
+  SELECT *
+  FROM unnest(
+    ${toSqlArray(ids)}::uuid[],
+    ${toSqlArray(acceptedLogs.map((x) => x.timestamp))}::timestamptz[],
+    ${toSqlArray(acceptedLogs.map((x) => x.level))}::log_level[],
+    ${toSqlArray(acceptedLogs.map((x) => x.service))}::text[],
+    ${toSqlArray(acceptedLogs.map((x) => x.message))}::text[],
+    ${toSqlArray(acceptedLogs.map((x) => JSON.stringify(x.attributes ?? {})))}::jsonb[]
+  );
+`);
 
   //send response
   return res.status(200).json({
