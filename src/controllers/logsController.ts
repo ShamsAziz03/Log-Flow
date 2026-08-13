@@ -3,8 +3,10 @@ import { BadRequestError } from "../errors/badRequest.js";
 import { isValidLogEntry } from "../services/ingestionLogs.js";
 import { db } from "../db/index.js";
 import { sql } from "drizzle-orm";
-import { logs } from "../db/schema.js";
 import { uuidv7 } from "uuidv7";
+import { and, desc } from "drizzle-orm";
+import { logs } from "../db/schema.js";
+import { queryLogsHandler } from "../services/queryLogs.js";
 
 type AcceptedLogEntry = {
   timestamp: string;
@@ -81,4 +83,25 @@ export async function insertLogs(req: Request, res: Response) {
     accepted: acceptedLogs.length,
     rejected: rejectedLogs,
   });
+}
+
+export async function queryLogs(req: Request, res: Response) {
+  const queryResult = queryLogsHandler(req);
+  const result = await db
+    .select()
+    .from(logs)
+    .where(and(...queryResult.conditions))
+    .orderBy(desc(logs.timestamp), desc(logs.id))
+    .limit(queryResult.logsLimit + 1);
+
+  if (result.length > queryResult.logsLimit) {
+    const lastLog = result[queryResult.logsLimit - 1];
+    const nextCursor = `${lastLog.timestamp.toISOString()}_${lastLog.id}`; // Create a cursor based on the last log's timestamp and ID
+    return res.status(200).json({
+      logs: result.slice(0, queryResult.logsLimit),
+      nextCursor,
+    });
+  }
+
+  return res.status(200).json({ logs: result, nextCursor: null });
 }
