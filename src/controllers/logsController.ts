@@ -120,7 +120,7 @@ export async function aggregateLogs(req: Request, res: Response) {
     const result = await db
       .select({
         start:
-          sql<string>`date_bin(${fullTime}, ${logs.timestamp}, '1970-01-01 00:00:00')`.as(
+          sql<Date>`date_bin(${fullTime}, ${logs.timestamp}, '1970-01-01 00:00:00')`.as(
             "start",
           ),
         group: groupByExpr.as("group"),
@@ -130,7 +130,12 @@ export async function aggregateLogs(req: Request, res: Response) {
       .where(and(...conditions))
       .groupBy(sql`start`, groupByExpr)
       .orderBy(sql`start ASC`);
-    return res.status(200).json(result);
+    const buckets = result.map((row: any) => ({
+      start: new Date(row.start).toISOString(),
+      group: row.group,
+      count: row.count,
+    }));
+    return res.status(200).json({ buckets });
   } else {
     const result = await db
       .select({
@@ -150,6 +155,6 @@ export async function aggregateLogs(req: Request, res: Response) {
       group: null,
       count: row.count,
     }));
-    return res.status(200).json(buckets);
+    return res.status(200).json({ buckets });
   }
 }

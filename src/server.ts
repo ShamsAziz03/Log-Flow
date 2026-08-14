@@ -4,7 +4,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { appState } from "./states.js";
 import healthRouter from "./routes/healthRoutes.js";
 import logsRouter from "./routes/logsRoutes.js";
-import { addPartitions } from "./jobs/partitionScript.js";
+import { addDeletePartitions } from "./jobs/partitionScript.js";
 import { Request, Response, NextFunction } from "express";
 import { BadRequestError } from "./errors/badRequest.js";
 import { NotFoundError } from "./errors/notFound.js";
@@ -72,14 +72,17 @@ app.use(errorHandler);
 
 async function setUp() {
   await migrate(db, { migrationsFolder: "./src/db/drizzle" });
-  await addPartitions(db);
+  await addDeletePartitions(db);
 
   setInterval(
     async () => {
       try {
-        await addPartitions(db);
+        await addDeletePartitions(db);
       } catch (error) {
-        console.error("Failed to add partitions in interval:", error);
+        console.error(
+          "Failed to add new partitions and delete old ones in interval:",
+          error,
+        );
       }
     },
     60 * 60 * 1000 * 3,
