@@ -8,7 +8,6 @@ export function queryLogsHandler(req: Request) {
   const { service, level, since, until, q, limit, cursor } = req.query;
 
   const conditions = [];
-  const attributes: Record<string, string> = {};
   let logsLimit = 100;
 
   if (typeof service === "string" && service) {
@@ -35,7 +34,7 @@ export function queryLogsHandler(req: Request) {
       throw new BadRequestError("Invalid 'since' date");
     }
     const iso8601Regex =
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:\d{2})?)$/;
     if (!iso8601Regex.test(since)) {
       throw new BadRequestError("Invalid 'since' timestamp, Not ISO format");
     }
@@ -96,20 +95,26 @@ export function queryLogsHandler(req: Request) {
     );
   }
 
+  const jsonToMatch: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(req.query)) {
     if (key.startsWith("attr.")) {
       const attrKey = key.split(".")[1];
 
       if (typeof value !== "string") {
-        throw new BadRequestError(`Attribute for ${attrKey} must be a string`);
+        throw new Error(`Attribute for ${attrKey} must be a string`);
       }
+      let parsedValue: string | number | boolean = value;
+      if (value === "true") parsedValue = true;
+      else if (value === "false") parsedValue = false;
+      else if (/^-?\d+(\.\d+)?$/.test(value)) parsedValue = Number(value);
 
-      attributes[attrKey] = value;
+      jsonToMatch[attrKey] = parsedValue;
     }
   }
-
-  for (const [key, value] of Object.entries(attributes)) {
-    conditions.push(sql`${logs.attributes}->>${key} = ${value}`);
+  if (Object.keys(jsonToMatch).length > 0) {
+    conditions.push(
+      sql`${logs.attributes} @> ${JSON.stringify(jsonToMatch)}::jsonb`,
+    );
   }
 
   return { conditions, logsLimit };

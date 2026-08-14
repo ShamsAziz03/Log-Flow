@@ -7,6 +7,7 @@ import { uuidv7 } from "uuidv7";
 import { and, desc } from "drizzle-orm";
 import { logs } from "../db/schema.js";
 import { queryLogsHandler } from "../services/queryLogs.js";
+import { aggregateLogsHandler } from "../services/aggregateLogs.js";
 
 type AcceptedLogEntry = {
   timestamp: string;
@@ -99,9 +100,56 @@ export async function queryLogs(req: Request, res: Response) {
     const nextCursor = `${lastLog.timestamp.toISOString()}_${lastLog.id}`; // Create a cursor based on the last log's timestamp and ID
     return res.status(200).json({
       logs: result.slice(0, queryResult.logsLimit),
-      nextCursor,
+      next_cursor: nextCursor,
     });
   }
 
-  return res.status(200).json({ logs: result, nextCursor: null });
+  return res.status(200).json({ logs: result, next_cursor: null });
+}
+
+export async function aggregateLogs(req: Request, res: Response) {
+  const { conditions, fullTime, group_by } = aggregateLogsHandler(req);
+  //do DB query
+  if (group_by === "service" || group_by === "level") {
+    let groupByExpr = null;
+    if (group_by === "service") {
+      groupByExpr = logs.service;
+    } else {
+      groupByExpr = logs.level;
+    }
+    const result = await db
+      .select({
+        start:
+          sql<string>`date_bin(${fullTime}, ${logs.timestamp}, '1970-01-01 00:00:00')`.as(
+            "start",
+          ),
+        group: groupByExpr.as("group"),
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(logs)
+      .where(and(...conditions))
+      .groupBy(sql`start`, groupByExpr)
+      .orderBy(sql`start ASC`);
+    return res.status(200).json(result);
+  } else {
+    const result = await db
+      .select({
+        start:
+          sql<Date>`date_bin(${fullTime}, ${logs.timestamp}, '1970-01-01 00:00:00')`.as(
+            "start",
+          ),
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(logs)
+      .where(and(...conditions))
+      .groupBy(sql`start`)
+      .orderBy(sql`start ASC`);
+
+    const buckets = result.map((row: any) => ({
+      start: new Date(row.start).toISOString(),
+      group: null,
+      count: row.count,
+    }));
+    return res.status(200).json(buckets);
+  }
 }
