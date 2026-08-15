@@ -9,7 +9,7 @@
     "dev": "tsx watch src/server.ts",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "build": "npx tsc",
+    "build": "tsc",
     "start": "node dist/server.js"
   },
   "keywords": [],
