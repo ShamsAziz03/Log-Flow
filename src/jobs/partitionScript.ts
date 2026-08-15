@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import type { DB } from "../db/index.js";
 
+type PartitionRow = { tablename: string };
+
 //format table name (e.g., logs_2026_07_20)
 function getTableName(date: Date) {
   const yyyy = date.getUTCFullYear();
@@ -42,8 +44,9 @@ export async function addDeletePartitions(db: DB) {
       `SELECT tablename FROM pg_tables WHERE tablename ~ '^logs_[0-9]{4}_[0-9]{2}_[0-9]{2}$'`,
     ),
   );
-  const newPartitions = partitions.rows.map(
-    (row: any) => new Date(row.tablename.slice(5).replaceAll("_", "-")),
+
+  const newPartitions: Date[] = (partitions.rows as PartitionRow[]).map(
+    (row) => new Date(row.tablename.slice(5).replaceAll("_", "-")),
   );
   for (const partitionDate of newPartitions) {
     if (partitionDate < cutoff) {

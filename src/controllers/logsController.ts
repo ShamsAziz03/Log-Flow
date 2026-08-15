@@ -20,6 +20,7 @@ type RejectedLogEntry = {
   index: number;
   reason: string;
 };
+type AggregateRow = { start: string | Date; group?: string; count: number };
 
 function toSqlArray(values: any[]) {
   return sql`ARRAY[${sql.join(
@@ -130,7 +131,7 @@ export async function aggregateLogs(req: Request, res: Response) {
       .where(and(...conditions))
       .groupBy(sql`start`, groupByExpr)
       .orderBy(sql`start ASC`);
-    const buckets = result.map((row: any) => ({
+    const buckets = result.map((row: AggregateRow) => ({
       start: new Date(row.start).toISOString(),
       group: row.group,
       count: row.count,
@@ -150,7 +151,7 @@ export async function aggregateLogs(req: Request, res: Response) {
       .groupBy(sql`start`)
       .orderBy(sql`start ASC`);
 
-    const buckets = result.map((row: any) => ({
+    const buckets = result.map((row: AggregateRow) => ({
       start: new Date(row.start).toISOString(),
       group: null,
       count: row.count,

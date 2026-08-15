@@ -1,5 +1,13 @@
 type ResultLogEntry = { success: boolean; reason: string };
 
+type LogEntry = {
+  timestamp?: string;
+  level?: string;
+  message?: string;
+  service?: string;
+  attributes?: Record<string, string | boolean | number>;
+};
+
 export function validateTimestamp(timestamp: unknown): string | null {
   if (typeof timestamp !== "string") {
     return "timestamp must be a string";
@@ -25,7 +33,7 @@ export function validateTimestamp(timestamp: unknown): string | null {
   return null; // valid
 }
 
-export function validateLevel(level: unknown): string | null {
+export function validateLevel(level: string | undefined): string | null {
   if (typeof level !== "string") {
     return "level must be a string";
   }
@@ -42,7 +50,7 @@ export function validateLevel(level: unknown): string | null {
   return null; // valid
 }
 
-export function validateService(service: unknown): string | null {
+export function validateService(service: string | undefined): string | null {
   if (typeof service !== "string") {
     return "service must be a string";
   }
@@ -54,7 +62,7 @@ export function validateService(service: unknown): string | null {
   return null; // valid
 }
 
-export function validateMessage(message: unknown): string | null {
+export function validateMessage(message: string | undefined): string | null {
   if (typeof message !== "string") {
     return "message must be a string";
   }
@@ -66,15 +74,15 @@ export function validateMessage(message: unknown): string | null {
   return null; // valid
 }
 
-export function validateAttributes(attributes: unknown): string | null {
+export function validateAttributes(
+  attributes: Record<string, boolean | string | number> | undefined,
+): string | null {
   if (typeof attributes !== "object" || attributes === null) {
     return "invalid attributes: must be an object";
   }
 
-  const typedAttributes = attributes as Record<string, unknown>;
-
-  for (let key in typedAttributes) {
-    let value = typedAttributes[key];
+  for (let key in attributes) {
+    let value = attributes[key];
     if (value === null || typeof value === "object" || Array.isArray(value)) {
       return "invalid attribute value: must be an flat object";
     }
@@ -89,7 +97,7 @@ export function validateAttributes(attributes: unknown): string | null {
   return null; // valid
 }
 
-export function isValidLogEntry(log: any): ResultLogEntry {
+export function isValidLogEntry(log: LogEntry): ResultLogEntry {
   if (typeof log !== "object" || log === null || Array.isArray(log)) {
     return {
       success: false,

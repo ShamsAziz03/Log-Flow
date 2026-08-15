@@ -12,12 +12,12 @@ import { UnauthorizedError } from "./errors/unauthorized.js";
 import { ForbiddenError } from "./errors/forbidden.js";
 
 const app: Application = express();
-const PORT: number = 3000;
+const PORT: number = 8080;
 
 app.use(express.json({ limit: "10mb" }));
 
 function errorHandler(
-  err: any,
+  err: Error,
   req: Request,
   res: Response,
   next: NextFunction,
