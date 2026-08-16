@@ -1,5 +1,5 @@
 import express, { Application } from "express";
-import { db } from "./db/index.js";
+import { db, pool } from "./db/index.js";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { appState } from "./states.js";
 import healthRouter from "./routes/healthRoutes.js";
@@ -70,11 +70,13 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
+let partitionInterval: NodeJS.Timeout;
+
 async function setUp() {
   await migrate(db, { migrationsFolder: "./src/db/drizzle" });
   await addDeletePartitions(db);
 
-  setInterval(
+  partitionInterval = setInterval(
     async () => {
       try {
         await addDeletePartitions(db);
@@ -90,7 +92,7 @@ async function setUp() {
 }
 
 async function start() {
-  app.listen(PORT, async () => {
+  const server = app.listen(PORT, async () => {
     console.log(`Server is running at http://localhost:${PORT}`);
     try {
       await setUp();
@@ -98,9 +100,26 @@ async function start() {
       console.log("Database connected successfully!");
     } catch (error) {
       console.error("Database connection failed!");
-      console.error(error);
     }
   });
+
+  const shutdown = async () => {
+    console.log("Shutting down gracefully...");
+
+    clearInterval(partitionInterval); // Stop the background job
+
+    server.close(async () => {
+      console.log("HTTP server closed.");
+      await pool.end(); // Close DB connections
+      console.log("Database pool closed.");
+      process.exit(0);
+    });
+
+    setTimeout(() => process.exit(1), 5000);
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 start();
