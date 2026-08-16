@@ -34,10 +34,10 @@ export async function addDeletePartitions(db: DB) {
     FOR VALUES FROM ('${getBoundaryDate(today)}') TO ('${getBoundaryDate(tomorrow)}');
   `),
   );
-  //2. Delete partitions older than 7 days
-  const retentionDays = parseInt(process.env.RETENTION_DAYS || "7", 10);
+  //2. Delete partitions older than 30 days
+  const retentionDays = parseInt(process.env.RETENTION_DAYS || "30", 10);
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - retentionDays); //its get the day of month and subtracts 7 days from it.
+  cutoff.setUTCDate(cutoff.getUTCDate() - retentionDays); //its get the day of month and subtracts 30 days from it.
 
   const partitions = await db.execute(
     sql.raw(
@@ -53,5 +53,30 @@ export async function addDeletePartitions(db: DB) {
       const partitionTable = getTableName(partitionDate);
       await db.execute(sql.raw(`DROP TABLE IF EXISTS ${partitionTable};`));
     }
+  }
+
+  //delete data from default table
+  await db.execute(sql.raw(`DELETE FROM logs_default WHERE timestamp < '${getBoundaryDate(cutoff)}';`));
+}
+
+export async function backfillPartitions(db: DB) {
+  const day = new Date();
+  day.setUTCDate(day.getUTCDate() - 30);
+
+  for (let i = 0; i < 30; i++) {
+    day.setUTCDate(day.getUTCDate() + 1);
+
+    const nextDay = new Date(day.getTime());
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+    const tableName = getTableName(day);
+
+    await db.execute(
+      sql.raw(`
+        CREATE TABLE IF NOT EXISTS ${tableName}
+        PARTITION OF logs
+        FOR VALUES FROM ('${getBoundaryDate(day)}') TO ('${getBoundaryDate(nextDay)}');
+      `),
+    );
   }
 }

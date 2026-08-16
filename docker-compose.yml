@@ -31,7 +31,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:123456@db:5432/logsflow
       - AUTH_ENABLED=false
-      - RETENTION_DAYS=7
+      - RETENTION_DAYS=30
     deploy:
       resources:
         limits:

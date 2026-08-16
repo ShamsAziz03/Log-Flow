@@ -4,12 +4,16 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { appState } from "./states.js";
 import healthRouter from "./routes/healthRoutes.js";
 import logsRouter from "./routes/logsRoutes.js";
-import { addDeletePartitions } from "./jobs/partitionScript.js";
+import {
+  addDeletePartitions,
+  backfillPartitions,
+} from "./jobs/partitionScript.js";
 import { Request, Response, NextFunction } from "express";
 import { BadRequestError } from "./errors/badRequest.js";
 import { NotFoundError } from "./errors/notFound.js";
 import { UnauthorizedError } from "./errors/unauthorized.js";
 import { ForbiddenError } from "./errors/forbidden.js";
+import { monitorEventLoopDelay } from "perf_hooks";
 
 const app: Application = express();
 const PORT: number = 8080;
@@ -68,12 +72,29 @@ app.use((req, res) => {
   });
 });
 
+// backpressure middleware
+const h = monitorEventLoopDelay({ resolution: 20 });
+h.enable();
+
+const MAX_LAG_MS = 300;
+app.use("/logs", (req, res, next) => {
+  const lagMs = h.mean / 1e6;
+  if (lagMs > MAX_LAG_MS) {
+    res.set("Retry-After", "1");
+    return res
+      .status(503)
+      .json({ error: "server overloaded, try again shortly" });
+  }
+  next();
+});
+
 app.use(errorHandler);
 
 let partitionInterval: NodeJS.Timeout;
 
 async function setUp() {
   await migrate(db, { migrationsFolder: "./src/db/drizzle" });
+  await backfillPartitions(db);
   await addDeletePartitions(db);
 
   partitionInterval = setInterval(
@@ -81,9 +102,8 @@ async function setUp() {
       try {
         await addDeletePartitions(db);
       } catch (error) {
-        console.error(
-          "Failed to add new partitions and delete old ones in interval:",
-          error,
+        throw new Error(
+          `Failed to add new partitions and delete old ones in interval: ${error}`,
         );
       }
     },
