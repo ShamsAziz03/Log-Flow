@@ -1,0 +1,32 @@
+name: Database & API CI
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Start Docker Compose Services
+      run: |
+        docker compose up
+
+    - name: Check Running Containers
+      run: |
+        docker compose ps
+
+
+    - name: Run Application Tests
+      run: |
+        docker compose exec -T api npm test
+        
+
+    - name: Teardown Services
+      if: always()
+      run: |
+        docker compose down -v
