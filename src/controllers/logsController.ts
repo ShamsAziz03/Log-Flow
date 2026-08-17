@@ -134,7 +134,7 @@ export async function aggregateLogs(req: Request, res: Response) {
     const buckets = result.map((row: AggregateRow) => ({
       start: new Date(row.start).toISOString(),
       group: row.group,
-      count: row.count,
+      count: Number(row.count),
     }));
     return res.status(200).json({ buckets });
   } else {
@@ -154,7 +154,7 @@ export async function aggregateLogs(req: Request, res: Response) {
     const buckets = result.map((row: AggregateRow) => ({
       start: new Date(row.start).toISOString(),
       group: null,
-      count: row.count,
+      count: Number(row.count),
     }));
     return res.status(200).json({ buckets });
   }

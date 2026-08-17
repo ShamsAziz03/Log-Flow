@@ -157,6 +157,8 @@ describe("smoke: core required API contract", () => {
         "GET",
         `${buildQuery("/logs", { service: SVC, limit: 1000 })}&attr.user_id=42`,
       );
+      console.log("status:", r.status);
+      console.log("body:", JSON.stringify(r.json, null, 2));
       expect(r.status).toBe(200);
       expect(r.json.logs.length).toBe(2);
     }
@@ -261,7 +263,7 @@ describe("smoke: core required API contract", () => {
     for (const b of r.json.buckets) {
       expect(typeof b.start).toBe("string");
       expect(b.group).toBeNull();
-      expect(typeof b.count).toBe("number");
+      expect(b.count).toBe("number");
     }
 
     const starts = r.json.buckets.map((b: any) => b.start);
@@ -333,6 +335,8 @@ describe("smoke: core required API contract", () => {
           service: SVC,
         })}&attr.user_id=42`,
       );
+      console.log("status:", r.status);
+      console.log("body:", JSON.stringify(r.json, null, 2));
       expect(r.status).toBe(200);
       expect(Array.isArray(r.json.buckets)).toBe(true);
       expect(r.json.buckets.length).toBeGreaterThanOrEqual(1);
