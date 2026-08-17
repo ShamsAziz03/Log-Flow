@@ -79,6 +79,8 @@ describe("smoke: core required API contract", () => {
     const r = await http("POST", "/logs", {
       body: JSON.stringify(payload),
     });
+    console.log("POST status:", r.status);
+    console.log("POST result:", JSON.stringify(r.json, null, 2));
 
     expect(r.status).toBe(200);
     expect(r.json).not.toBeNull();
@@ -263,7 +265,7 @@ describe("smoke: core required API contract", () => {
     for (const b of r.json.buckets) {
       expect(typeof b.start).toBe("string");
       expect(b.group).toBeNull();
-      expect(b.count).toBe("number");
+      expect(typeof b.count).toBe("number");
     }
 
     const starts = r.json.buckets.map((b: any) => b.start);
