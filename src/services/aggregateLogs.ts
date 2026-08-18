@@ -79,12 +79,7 @@ export function aggregateLogsHandler(req: Request) {
       if (typeof value !== "string") {
         throw new Error(`Attribute for ${attrKey} must be a string`);
       }
-      let parsedValue: string | number | boolean = value;
-      if (value === "true") parsedValue = true;
-      else if (value === "false") parsedValue = false;
-      else if (/^-?\d+(\.\d+)?$/.test(value)) parsedValue = Number(value);
-
-      jsonToMatch[attrKey] = parsedValue;
+      jsonToMatch[attrKey] = value;
     }
   }
   if (Object.keys(jsonToMatch).length > 0) {
