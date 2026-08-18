@@ -38,6 +38,10 @@ export const logs = pgTable(
   (table) => [
     index("idx_logs_time_id").on(table.timestamp.desc(), table.id.desc()),
     index("idx_logs_service_level").on(table.service, table.level),
+    index("idx_logs_attributes").using(
+      "gin",
+      sql`${table.attributes} jsonb_path_ops`,
+    ),
   ],
 );
 

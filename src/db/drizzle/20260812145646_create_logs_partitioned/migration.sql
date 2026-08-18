@@ -15,5 +15,6 @@ CREATE TABLE IF NOT EXISTS "logs" (
 
 CREATE INDEX idx_logs_time_id ON logs (timestamp DESC, id DESC);
 CREATE INDEX idx_logs_service_level ON logs (service, level);
+CREATE INDEX idx_logs_attributes ON logs USING GIN (attributes jsonb_path_ops);
 
 CREATE TABLE IF NOT EXISTS logs_default PARTITION OF logs DEFAULT;
