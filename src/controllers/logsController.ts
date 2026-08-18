@@ -1,13 +1,14 @@
 import { Request, Response } from "express";
 import { BadRequestError } from "../errors/badRequest.js";
 import { isValidLogEntry } from "../services/ingestionLogs.js";
-import { db } from "../db/index.js";
+import { db, pool } from "../db/index.js";
 import { sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 import { and, desc } from "drizzle-orm";
 import { logs } from "../db/schema.js";
 import { queryLogsHandler } from "../services/queryLogs.js";
 import { aggregateLogsHandler } from "../services/aggregateLogs.js";
+import { from } from "pg-copy-streams";
 
 type AcceptedLogEntry = {
   timestamp: string;
@@ -29,62 +30,123 @@ function toSqlArray(values: any[]) {
   )}]`;
 }
 
+// export async function insertLogs(req: Request, res: Response) {
+//   const logs = req.body.logs;
+//   const rejectedLogs: RejectedLogEntry[] = [];
+//   const acceptedLogs: AcceptedLogEntry[] = [];
+
+//   //check top level logs is an array
+//   if (!Array.isArray(logs)) {
+//     throw new BadRequestError("logs must be an array");
+//   }
+
+//   //now check each entry
+//   for (let i = 0; i < logs.length; i++) {
+//     const result = isValidLogEntry(logs[i]);
+
+//     if (!result.success) {
+//       rejectedLogs.push({ index: i + 1, reason: result.reason });
+//     } else {
+//       acceptedLogs.push(logs[i]);
+//     }
+//   }
+
+//   //check if all entries were rejected
+//   if (acceptedLogs.length === 0) {
+//     return res.status(400).json({
+//       accepted: acceptedLogs.length,
+//       rejected: rejectedLogs,
+//     });
+//   }
+
+//   //add accepted logs to database
+//   const ids = acceptedLogs.map(() => uuidv7());
+//   await db.execute(sql`
+//   INSERT INTO logs (
+//     id,
+//     timestamp,
+//     level,
+//     service,
+//     message,
+//     attributes
+//   )
+//   SELECT *
+//   FROM unnest(
+//     ${toSqlArray(ids)}::uuid[],
+//     ${toSqlArray(acceptedLogs.map((x) => x.timestamp))}::timestamptz[],
+//     ${toSqlArray(acceptedLogs.map((x) => x.level))}::log_level[],
+//     ${toSqlArray(acceptedLogs.map((x) => x.service))}::text[],
+//     ${toSqlArray(acceptedLogs.map((x) => x.message))}::text[],
+//     ${toSqlArray(acceptedLogs.map((x) => JSON.stringify(x.attributes ?? {})))}::jsonb[]
+//   );
+// `);
+
+//   //send response
+//   return res.status(200).json({
+//     accepted: acceptedLogs.length,
+//     rejected: rejectedLogs,
+//   });
+// }
+function escapeCsv(value: string): string {
+  return value.replace(/"/g, '""');
+}
+
 export async function insertLogs(req: Request, res: Response) {
-  const logs = req.body.logs;
-  const rejectedLogs: RejectedLogEntry[] = [];
-  const acceptedLogs: AcceptedLogEntry[] = [];
+  const client = await pool.connect();
 
-  //check top level logs is an array
-  if (!Array.isArray(logs)) {
-    throw new BadRequestError("logs must be an array");
-  }
+  try {
+    const rejectedLogs: RejectedLogEntry[] = [];
+    const acceptedLogs: AcceptedLogEntry[] = [];
 
-  //now check each entry
-  for (let i = 0; i < logs.length; i++) {
-    const result = isValidLogEntry(logs[i]);
-
-    if (!result.success) {
-      rejectedLogs.push({ index: i + 1, reason: result.reason });
-    } else {
-      acceptedLogs.push(logs[i]);
+    if (!Array.isArray(req.body.logs)) {
+      throw new BadRequestError("logs must be an array");
     }
-  }
 
-  //check if all entries were rejected
-  if (acceptedLogs.length === 0) {
-    return res.status(400).json({
+    for (let i = 0; i < req.body.logs.length; i++) {
+      const result = isValidLogEntry(req.body.logs[i]);
+      if (!result.success) {
+        rejectedLogs.push({ index: i + 1, reason: result.reason });
+      } else {
+        acceptedLogs.push(req.body.logs[i]);
+      }
+    }
+
+    if (acceptedLogs.length === 0) {
+      return res.status(400).json({
+        accepted: acceptedLogs.length,
+        rejected: rejectedLogs,
+      });
+    }
+
+    const copyStream = client.query(
+      from(`
+        COPY logs (id, timestamp, level, service, message, attributes)
+        FROM STDIN WITH (FORMAT csv)
+      `),
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      copyStream.on("finish", resolve);
+      copyStream.on("error", reject);
+
+      for (const log of acceptedLogs) {
+        const id = uuidv7();
+        copyStream.write(
+          `${id},${log.timestamp},${log.level},${log.service},${escapeCsv(log.message)},"${escapeCsv(JSON.stringify(log.attributes ?? {}))}"\n`,
+        );
+      }
+      copyStream.end();
+    });
+
+    return res.status(200).json({
       accepted: acceptedLogs.length,
       rejected: rejectedLogs,
     });
+  } catch (err) {
+    throw err;
+  } finally {
+    client.release();
   }
-
-  //add accepted logs to database
-  const ids = acceptedLogs.map(() => uuidv7());
-  await db.execute(sql`
-  INSERT INTO logs (
-    id,
-    timestamp,
-    level,
-    service,
-    message,
-    attributes
-  )
-  SELECT *
-  FROM unnest(
-    ${toSqlArray(ids)}::uuid[],
-    ${toSqlArray(acceptedLogs.map((x) => x.timestamp))}::timestamptz[],
-    ${toSqlArray(acceptedLogs.map((x) => x.level))}::log_level[],
-    ${toSqlArray(acceptedLogs.map((x) => x.service))}::text[],
-    ${toSqlArray(acceptedLogs.map((x) => x.message))}::text[],
-    ${toSqlArray(acceptedLogs.map((x) => JSON.stringify(x.attributes ?? {})))}::jsonb[]
-  );
-`);
-
-  //send response
-  return res.status(200).json({
-    accepted: acceptedLogs.length,
-    rejected: rejectedLogs,
-  });
 }
 
 export async function queryLogs(req: Request, res: Response) {

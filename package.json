@@ -20,12 +20,14 @@
     "drizzle-orm": "^1.0.0-rc.4",
     "express": "^5.2.1",
     "pg": "^8.23.0",
+    "pg-copy-streams": "^7.0.0",
     "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
     "@types/pg": "^8.21.0",
+    "@types/pg-copy-streams": "^1.2.5",
     "drizzle-kit": "^1.0.0-rc.4",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
