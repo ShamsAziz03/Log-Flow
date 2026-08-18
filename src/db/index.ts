@@ -11,6 +11,7 @@ export type DB = NodePgDatabase<EmptyRelations> & {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 25,
 });
 
 export const db = drizzle({ client: pool });

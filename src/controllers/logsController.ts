@@ -23,70 +23,7 @@ type RejectedLogEntry = {
 };
 type AggregateRow = { start: string | Date; group?: string; count: number };
 
-function toSqlArray(values: any[]) {
-  return sql`ARRAY[${sql.join(
-    values.map((v) => sql`${v}`),
-    sql`, `,
-  )}]`;
-}
 
-// export async function insertLogs(req: Request, res: Response) {
-//   const logs = req.body.logs;
-//   const rejectedLogs: RejectedLogEntry[] = [];
-//   const acceptedLogs: AcceptedLogEntry[] = [];
-
-//   //check top level logs is an array
-//   if (!Array.isArray(logs)) {
-//     throw new BadRequestError("logs must be an array");
-//   }
-
-//   //now check each entry
-//   for (let i = 0; i < logs.length; i++) {
-//     const result = isValidLogEntry(logs[i]);
-
-//     if (!result.success) {
-//       rejectedLogs.push({ index: i + 1, reason: result.reason });
-//     } else {
-//       acceptedLogs.push(logs[i]);
-//     }
-//   }
-
-//   //check if all entries were rejected
-//   if (acceptedLogs.length === 0) {
-//     return res.status(400).json({
-//       accepted: acceptedLogs.length,
-//       rejected: rejectedLogs,
-//     });
-//   }
-
-//   //add accepted logs to database
-//   const ids = acceptedLogs.map(() => uuidv7());
-//   await db.execute(sql`
-//   INSERT INTO logs (
-//     id,
-//     timestamp,
-//     level,
-//     service,
-//     message,
-//     attributes
-//   )
-//   SELECT *
-//   FROM unnest(
-//     ${toSqlArray(ids)}::uuid[],
-//     ${toSqlArray(acceptedLogs.map((x) => x.timestamp))}::timestamptz[],
-//     ${toSqlArray(acceptedLogs.map((x) => x.level))}::log_level[],
-//     ${toSqlArray(acceptedLogs.map((x) => x.service))}::text[],
-//     ${toSqlArray(acceptedLogs.map((x) => x.message))}::text[],
-//     ${toSqlArray(acceptedLogs.map((x) => JSON.stringify(x.attributes ?? {})))}::jsonb[]
-//   );
-// `);
-
-//   //send response
-//   return res.status(200).json({
-//     accepted: acceptedLogs.length,
-//     rejected: rejectedLogs,
-//   });
-// }
 function escapeCsv(value: string): string {
   return value.replace(/"/g, '""');
 }
@@ -105,7 +42,7 @@ export async function insertLogs(req: Request, res: Response) {
     for (let i = 0; i < req.body.logs.length; i++) {
       const result = isValidLogEntry(req.body.logs[i]);
       if (!result.success) {
-        rejectedLogs.push({ index: i + 1, reason: result.reason });
+        rejectedLogs.push({ index: i, reason: result.reason });
       } else {
         acceptedLogs.push(req.body.logs[i]);
       }
