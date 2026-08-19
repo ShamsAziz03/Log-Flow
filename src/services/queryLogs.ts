@@ -95,21 +95,15 @@ export function queryLogsHandler(req: Request) {
     );
   }
 
-  const jsonToMatch: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(req.query)) {
-    if (key.startsWith("attr.")) {
-      const attrKey = key.split(".")[1];
-
-      if (typeof value !== "string") {
-        throw new Error(`Attribute for ${attrKey} must be a string`);
-      }
-      jsonToMatch[attrKey] = value;
+    if (!key.startsWith("attr.")) continue;
+    const attrKey = key.slice(5);
+    if (!attrKey || typeof value !== "string") {
+      throw new BadRequestError(
+        `Attribute filter '${key}' must have a string value`,
+      );
     }
-  }
-  if (Object.keys(jsonToMatch).length > 0) {
-    conditions.push(
-      sql`${logs.attributes} @> ${JSON.stringify(jsonToMatch)}::jsonb`,
-    );
+    conditions.push(sql`${logs.attributes}->>${attrKey} = ${value}`);
   }
 
   return { conditions, logsLimit };
