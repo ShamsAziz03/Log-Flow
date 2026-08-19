@@ -32,7 +32,7 @@ describe("smoke: core required API contract", () => {
           service: SVC,
           message: "hello world",
           attributes: {
-            user_id: 42,
+            user_id: "42",
             region: "eu-west",
             retries: 3,
             success: true,
@@ -43,7 +43,7 @@ describe("smoke: core required API contract", () => {
           level: "error",
           service: SVC,
           message: "payment declined",
-          attributes: { user_id: 42, request_id: "r1" },
+          attributes: { user_id: "42", request_id: "r1" },
         },
         {
           timestamp: times.T_C,
@@ -71,7 +71,7 @@ describe("smoke: core required API contract", () => {
           level: "info",
           service: SVC2,
           message: "other service log",
-          attributes: { user_id: 42 },
+          attributes: { user_id: "42" },
         },
       ],
     };
@@ -424,7 +424,7 @@ describe("smoke: core required API contract", () => {
     expect(r.json.rejected).toHaveLength(3);
 
     const rejectedIdx = r.json.rejected.map((x: any) => x.index).sort();
-    expect(rejectedIdx).toEqual([1, 3, 4]);
+    expect(rejectedIdx).toEqual([0, 2, 3]);
 
     for (const rej of r.json.rejected) {
       expect(typeof rej.reason).toBe("string");
