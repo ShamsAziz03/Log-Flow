@@ -105,27 +105,10 @@ export function isValidLogEntry(log: LogEntry): ResultLogEntry {
     };
   }
   //check other data
-  if (
-    !Object.hasOwn(log, "timestamp") ||
-    !Object.hasOwn(log, "level") ||
-    !Object.hasOwn(log, "service") ||
-    !Object.hasOwn(log, "message")
-  ) {
-    let missing;
-
-    if (!Object.hasOwn(log, "timestamp")) {
-      missing = "timestamp";
-    } else if (!Object.hasOwn(log, "level")) {
-      missing = "level";
-    } else if (!Object.hasOwn(log, "service")) {
-      missing = "service";
-    } else missing = "message";
-
-    return {
-      success: false,
-      reason: `Missing required field: ${missing}`,
-    };
-  }
+  if (!log.timestamp) return { success: false, reason: "Missing timestamp" };
+  if (!log.level) return { success: false, reason: "Missing level" };
+  if (!log.service) return { success: false, reason: "Missing service" };
+  if (!log.message) return { success: false, reason: "Missing message" };
 
   //check time
   const time = validateTimestamp(log.timestamp);
