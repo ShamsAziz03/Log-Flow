@@ -23,69 +23,60 @@ type RejectedLogEntry = {
 };
 type AggregateRow = { start: string | Date; group?: string; count: number };
 
-
 function escapeCsv(value: string): string {
   return value.replace(/"/g, '""');
 }
 
 export async function insertLogs(req: Request, res: Response) {
+  if (!Array.isArray(req.body.logs))
+    throw new BadRequestError("logs must be an array");
+
+  const rejectedLogs: RejectedLogEntry[] = [];
+  const csvRows: string[] = [];
+  let acceptedCount = 0;
+
+  for (let i = 0; i < req.body.logs.length; i++) {
+    const log = req.body.logs[i];
+    const result = isValidLogEntry(log);
+
+    if (!result.success) {
+      rejectedLogs.push({ index: i, reason: result.reason });
+    } else {
+      acceptedCount++;
+      const id = uuidv7();
+      const attrs = log.attributes ? JSON.stringify(log.attributes) : "{}";
+      csvRows.push(
+        `${id},${log.timestamp},${log.level},${log.service},${escapeCsv(log.message)},"${escapeCsv(attrs)}"`,
+      );
+    }
+  }
+  const csvData = csvRows.join("\n") + "\n";
+  if (acceptedCount === 0) {
+    return res.status(400).json({ accepted: 0, rejected: rejectedLogs });
+  }
+
   const client = await pool.connect();
-
   try {
-    const rejectedLogs: RejectedLogEntry[] = [];
-    const acceptedLogs: AcceptedLogEntry[] = [];
-
-    if (!Array.isArray(req.body.logs)) {
-      throw new BadRequestError("logs must be an array");
-    }
-
-    for (let i = 0; i < req.body.logs.length; i++) {
-      const result = isValidLogEntry(req.body.logs[i]);
-      if (!result.success) {
-        rejectedLogs.push({ index: i, reason: result.reason });
-      } else {
-        acceptedLogs.push(req.body.logs[i]);
-      }
-    }
-
-    if (acceptedLogs.length === 0) {
-      return res.status(400).json({
-        accepted: acceptedLogs.length,
-        rejected: rejectedLogs,
-      });
-    }
-
     const copyStream = client.query(
-      from(`
-        COPY logs (id, timestamp, level, service, message, attributes)
-        FROM STDIN WITH (FORMAT csv)
-      `),
+      from(
+        `COPY logs (id, timestamp, level, service, message, attributes) FROM STDIN WITH (FORMAT csv)`,
+      ),
     );
 
     await new Promise<void>((resolve, reject) => {
       copyStream.on("finish", resolve);
       copyStream.on("error", reject);
-
-      for (const log of acceptedLogs) {
-        const id = uuidv7();
-        copyStream.write(
-          `${id},${log.timestamp},${log.level},${log.service},${escapeCsv(log.message)},"${escapeCsv(JSON.stringify(log.attributes ?? {}))}"\n`,
-        );
-      }
+      copyStream.write(csvData);
       copyStream.end();
     });
 
-    return res.status(200).json({
-      accepted: acceptedLogs.length,
-      rejected: rejectedLogs,
-    });
-  } catch (err) {
-    throw err;
+    return res
+      .status(200)
+      .json({ accepted: acceptedCount, rejected: rejectedLogs });
   } finally {
     client.release();
   }
 }
-
 export async function queryLogs(req: Request, res: Response) {
   const queryResult = queryLogsHandler(req);
   const result = await db
